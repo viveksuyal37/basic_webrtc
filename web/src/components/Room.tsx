@@ -16,33 +16,64 @@ const Room = ({ localStream }: { localStream: MediaStream | null }) => {
     const pc1 = new RTCPeerConnection(); //sending peer
     const pc2 = new RTCPeerConnection(); //receiving peer
 
+    pc1.onicecandidate = (e) => {
+      console.log("sending ice candidates", e.candidate);
+      socket.emit("add-ice-candidates", {
+        candidate: e.candidate,
+        type: "sender",
+      });
+    };
+
+    pc2.onicecandidate = async (e) => {
+      if (!e.candidate) {
+        return;
+      }
+      console.log("ice candidate received on receiving peer", e.candidate);
+      if (e.candidate) {
+        socket.emit("add-ice-candidates", {
+          candidate: e.candidate,
+          type: "receiver",
+        });
+      }
+    };
+
+    pc2.ontrack = (e) => {
+      console.log("received tracks", e.track);
+
+      console.log(`Track kind: ${e.track.kind}, muted: ${e.track.muted}`);
+
+      if (!videoRef.current) {
+        console.log("videoRef is null, returning");
+        return;
+      }
+
+      if (!videoRef.current.srcObject) {
+        videoRef.current.srcObject = new MediaStream();
+      }
+      //@ts-ignore
+      videoRef.current.srcObject.addTrack(e.track);
+      videoRef.current.play();
+    };
+
     //upon receiving start message from server send offer to other user
     socket.on("start", async ({ roomId }) => {
       console.log("received roomId", roomId);
 
       //add tracks to sending peer
       if (localVideoTrack) {
+        // console.log(localAudioTrack?.muted,localVideoTrack?.muted)
         pc1.addTrack(localVideoTrack);
       }
       if (localAudioTrack) {
         pc1.addTrack(localAudioTrack);
       }
 
-      pc1.onicecandidate = (e) => {
-        console.log("sending ice candidates", e.candidate);
-        socket.emit("add-ice-candidates", {
-          candidate: e.candidate,
-          type: "sender",
-          roomId,
-        });
-      };
-
       //create offer if negotiation is needed
       pc1.onnegotiationneeded = async () => {
         console.log("negotiation needed");
         const sdp = await pc1.createOffer();
-        pc1.setLocalDescription(sdp);
-        socket.emit("offer", { sdp, roomId });
+        await pc1.setLocalDescription(sdp);
+        socket.emit("offer", { sdp: pc1.localDescription, roomId });
       };
     });
 
@@ -59,39 +90,16 @@ const Room = ({ localStream }: { localStream: MediaStream | null }) => {
         console.log(" received offer", remoteSdp);
         setJoined(true);
 
-        pc2.ontrack = (e) => {
-          console.log("received tracks", e.track);
-
-          if (!videoRef.current) return;
-
-          if (!videoRef.current.srcObject) {
-            videoRef.current.srcObject = new MediaStream();
-          }
-
-          const mediaStream = videoRef.current.srcObject as MediaStream;
-          mediaStream.addTrack(e.track);
-
-          videoRef.current.play();
-        };
-
         await pc2.setRemoteDescription(remoteSdp);
-
         const sdp = await pc2.createAnswer();
-
-        pc2.onicecandidate = async (e) => {
-          if (!e.candidate) {
-            return;
-          }
-          console.log("ice candidate received on receiving peer", e.candidate);
-          if (e.candidate) {
-            socket.emit("add-ice-candidates", {
-              candidate: e.candidate,
-              type: "receiver",
-              roomId,
-            });
-          }
-        };
+        await pc2.setLocalDescription(sdp);
+        socket.emit("answer", { sdp: pc2.localDescription, roomId });
       }
+
+
+
+
+    
     );
 
     //upon receiving answer set remote description
@@ -100,12 +108,12 @@ const Room = ({ localStream }: { localStream: MediaStream | null }) => {
       async ({ sdp: remoteSdp }: { sdp: RTCSessionDescriptionInit }) => {
         console.log("received answer", remoteSdp);
 
-        pc2?.setRemoteDescription(remoteSdp);
+        await pc1?.setRemoteDescription(remoteSdp);
       }
     );
 
     socket.on("add-ice-candidates", ({ candidate, type }) => {
-      console.log("adding ice candidate from remote");
+      console.log("adding ice candidate from ",type);
       console.log({ candidate, type });
       if (type == "sender") {
         pc2?.addIceCandidate(candidate);
@@ -113,6 +121,10 @@ const Room = ({ localStream }: { localStream: MediaStream | null }) => {
         pc1?.addIceCandidate(candidate);
       }
     });
+
+
+
+
   }, []);
 
   useEffect(() => {

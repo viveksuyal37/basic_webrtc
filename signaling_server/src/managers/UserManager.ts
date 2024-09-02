@@ -65,8 +65,8 @@ export class UserManager {
       this.roomManager.onAnswer(roomId, sdp, socket.id);
     });
 
-    socket.on("add-ice-candidatess", ({ candidate, roomId, type }) => {
-      this.roomManager.onIceCandidates(roomId, socket.id, candidate, type);
+    socket.on("add-ice-candidates", ({ candidate, roomId, type }) => {
+      this.roomManager.onIceCandidates( socket.id, candidate, type);
     });
   }
 }
@@ -124,18 +124,17 @@ class RoomManager {
   }
 
   onIceCandidates(
-    roomId: string,
     senderSocketid: string,
     candidate: any,
     type: "sender" | "receiver"
   ) {
-    const room = this.rooms.get(roomId);
+    const room = this.rooms.get(senderSocketid);
     if (!room) {
       return;
     }
 
     const receivingUser =
       room.user1.socket.id === senderSocketid ? room.user2 : room.user1;
-    receivingUser.socket.emit("add-ice-candidates", { candidate, type });
+    receivingUser.socket.emit("add-ice-candidate", { candidate, type });
   }
 }
