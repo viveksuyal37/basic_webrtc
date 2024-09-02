@@ -45,7 +45,7 @@ class UserManager {
         socket.on("answer", ({ sdp, roomId }) => {
             this.roomManager.onAnswer(roomId, sdp, socket.id);
         });
-        socket.on("add-ice-candidates", ({ candidate, roomId, type }) => {
+        socket.on("add-ice-candidatess", ({ candidate, roomId, type }) => {
             this.roomManager.onIceCandidates(roomId, socket.id, candidate, type);
         });
     }
@@ -60,8 +60,8 @@ class RoomManager {
         this.rooms.set(roomId, { user1, user2 });
         console.log("created room:", roomId);
         //once room is created share room id with both users
-        user1.socket.emit("send-roomId", { roomId });
-        user2.socket.emit("send-roomId", { roomId });
+        user1.socket.emit("start", { roomId });
+        user2.socket.emit("start", { roomId });
     }
     removeRoom(roomId) {
         console.log(`removing room ${roomId}`);
@@ -100,6 +100,6 @@ class RoomManager {
             return;
         }
         const receivingUser = room.user1.socket.id === senderSocketid ? room.user2 : room.user1;
-        receivingUser.socket.emit("add-ice-candidate", { candidate, type });
+        receivingUser.socket.emit("add-ice-candidates", { candidate, type });
     }
 }

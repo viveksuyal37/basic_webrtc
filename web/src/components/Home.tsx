@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import Room from "./Room";
 
 const Home = () => {
-  const [joined, setJoined] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const startMatching = () => {
-    setJoined(true);
+    setIsIdle(true);
   };
 
   async function getUserMediaStream() {
@@ -18,19 +18,19 @@ const Home = () => {
 
     setLocalStream(stream);
     if (!videoRef.current) return;
-    videoRef.current.srcObject = stream;
+    videoRef.current.srcObject = new MediaStream([stream.getVideoTracks()[0]]);
   }
 
   useEffect(() => {
     getUserMediaStream();
   }, []);
 
-  if (!joined) {
+  if (!isIdle) {
     return (
-      <main className="flex flex-col gap-5 items-center justify-center h-screen bg-black">
+      <main className="flex flex-col items-center justify-center h-screen gap-5 bg-black">
         <video ref={videoRef} autoPlay className="w-[40vw] rounded-lg"></video>
         <button
-          className="bg-white rounded-md text-black px-2 py-1 "
+          className="px-2 py-1 text-black bg-white rounded-md "
           onClick={startMatching}
         >
           Join Room
